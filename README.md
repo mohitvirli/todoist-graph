@@ -2,6 +2,11 @@
 
 Tiny Electron desktop app. GitHub-style contribution heatmap of your Todoist completions over the last 3 months.
 
+## Demo
+<img width="642" height="332" alt="image" src="https://github.com/user-attachments/assets/23b5148f-838c-4f33-88da-46f91ab1c8d5" />
+<img width="642" height="332" alt="image" src="https://github.com/user-attachments/assets/651940bc-3dfd-48fe-b673-25ca9674746a" />
+
+
 ## Setup
 
 1. `npm install`
@@ -17,16 +22,6 @@ Optional: set `TODOIST_API_KEY` in a `.env` file for dev — used as fallback if
 - **Preload** (`electron/preload.js`): `contextBridge` exposes `window.api.fetchTasks()`, `getCached()`, `getToken()`, `setToken()`, `clearToken()`, `getTheme()`, `closeWindow()`, `openExternal()`, focus/theme listeners.
 - **Renderer** (`src/`): vanilla JS. First-run shows setup view to enter token; otherwise boots from cache instantly, then refreshes in background. Re-fetches on window focus + every 15 min. Manual refresh button with spin. Gear icon reopens setup to update or clear token.
 - **Reflow**: graph computes `maxWeeks = floor((width + gap) / weekWidth)` on every render; `resize` re-renders so cells stay fixed (11px) and the column count adapts.
-
-## Color scale
-
-| Tasks | Class |
-|-------|-------|
-| 0     | muted gray |
-| 1     | light teal |
-| 2–3   | mid teal |
-| 4–7   | strong teal |
-| 8+    | darkest teal |
 
 ## Window
 
