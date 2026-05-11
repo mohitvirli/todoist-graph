@@ -1,7 +1,11 @@
 const { app, BrowserWindow, ipcMain, nativeTheme } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const Store = require('electron-store');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
+const PRELOAD = path.resolve(__dirname, 'preload.js');
+console.log('[main] preload path:', PRELOAD, 'exists:', fs.existsSync(PRELOAD));
 
 const store = new Store({
   defaults: {
@@ -29,9 +33,10 @@ function createWindow() {
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0d1117' : '#ffffff',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: PRELOAD,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: false
     }
   });
 
@@ -42,6 +47,13 @@ function createWindow() {
   }
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
+
+  mainWindow.webContents.on('preload-error', (_e, file, err) => {
+    console.error('[main] preload error in', file, err);
+  });
+  mainWindow.webContents.on('console-message', (event) => {
+    console.log('[renderer]', event.message);
+  });
 
   const saveBounds = () => {
     if (!mainWindow) return;
@@ -68,25 +80,35 @@ async function fetchCompletedTasks() {
     throw new Error('Missing TODOIST_API_KEY in .env');
   }
 
+  const until = new Date();
   const since = new Date();
   since.setMonth(since.getMonth() - 3);
-  const sinceStr = since.toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const fmt = (d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
 
-  const url = `https://api.todoist.com/sync/v9/completed/get_all?limit=200&since=${encodeURIComponent(sinceStr)}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` }
+  const params = new URLSearchParams({
+    since: fmt(since),
+    until: fmt(until),
+    limit: '200'
   });
+  const url = `https://api.todoist.com/api/v1/tasks/completed/by_completion_date?${params}`;
 
-  if (!res.ok) {
-    throw new Error(`Todoist API ${res.status}: ${await res.text()}`);
-  }
-
-  const data = await res.json();
-  const items = (data.items || []).map(it => ({
-    id: it.id,
-    content: it.content,
-    completed_at: it.completed_at
-  }));
+  const items = [];
+  let cursor = null;
+  do {
+    const reqUrl = cursor ? `${url}&cursor=${encodeURIComponent(cursor)}` : url;
+    const res = await fetch(reqUrl, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) {
+      throw new Error(`Todoist API ${res.status}: ${await res.text()}`);
+    }
+    const data = await res.json();
+    for (const it of (data.items || [])) {
+      items.push({ id: it.id, content: it.content, completed_at: it.completed_at });
+      if (items.length >= 200) break;
+    }
+    cursor = data.next_cursor || null;
+  } while (cursor && items.length < 200);
 
   store.set('completed', items);
   store.set('lastFetched', Date.now());

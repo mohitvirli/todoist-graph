@@ -55,6 +55,11 @@ async function refresh() {
 }
 
 async function bootstrap() {
+  if (!window.api) {
+    lastUpdatedEl.textContent = 'Preload failed to load';
+    console.error('window.api missing — preload did not attach');
+    return;
+  }
   // Apply theme
   const dark = await window.api.getTheme();
   applyTheme(dark);
@@ -77,8 +82,10 @@ window.addEventListener('resize', () => {
   rerender();
 });
 
-window.api.onFocus(() => refresh());
-window.api.onThemeChange((dark) => applyTheme(dark));
+if (window.api) {
+  window.api.onFocus(() => refresh());
+  window.api.onThemeChange((dark) => applyTheme(dark));
+}
 
 setInterval(refresh, 15 * 60 * 1000);
 setInterval(updateLastUpdated, 30 * 1000);
