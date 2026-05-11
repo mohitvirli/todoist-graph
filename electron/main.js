@@ -12,12 +12,63 @@ const store = new Store({
     bounds: { width: 720, height: 300, x: undefined, y: undefined },
     completed: [],
     lastFetched: 0,
-    token: ''
+    token: '',
+    theme: 'system',
+    zoom: 1.0
   }
 });
 
 let mainWindow = null;
 const isDev = !app.isPackaged;
+
+/** Minimum time between Todoist HTTP calls (pagination, verify, etc.) */
+const MIN_MS_BETWEEN_TODOIST_REQUESTS = 400;
+/** Minimum time between completed full syncs (`fetch-tasks`) */
+const MIN_MS_BETWEEN_FULL_SYNCS = 6000;
+
+let nextTodoistAfter = 0;
+let todoistRequestChain = Promise.resolve();
+let lastFullSyncDone = 0;
+let fullSyncInFlight = null;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function enqueueTodoistRequest(fn) {
+  const run = todoistRequestChain.then(fn, fn);
+  todoistRequestChain = run.catch(() => {});
+  return run;
+}
+
+/**
+ * Serialized Todoist GET with spacing and 429 handling.
+ * @param {string} url
+ * @param {string} token
+ */
+async function todoistGet(url, token) {
+  return enqueueTodoistRequest(async () => {
+    const gap = Math.max(0, nextTodoistAfter - Date.now());
+    if (gap > 0) await sleep(gap);
+
+    let res;
+    let backoffMs = 1500;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.status !== 429) break;
+      const raw = res.headers.get('retry-after');
+      const sec = raw ? parseInt(raw, 10) : NaN;
+      const wait = Number.isFinite(sec) && sec > 0 ? Math.min(sec * 1000, 120000) : backoffMs;
+      await sleep(wait);
+      backoffMs = Math.min(backoffMs * 2, 120000);
+    }
+
+    nextTodoistAfter = Date.now() + MIN_MS_BETWEEN_TODOIST_REQUESTS;
+    return res;
+  });
+}
 
 function createWindow() {
   const bounds = store.get('bounds');
@@ -97,9 +148,7 @@ async function fetchCompletedTasks() {
   let cursor = null;
   do {
     const reqUrl = cursor ? `${url}&cursor=${encodeURIComponent(cursor)}` : url;
-    const res = await fetch(reqUrl, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const res = await todoistGet(reqUrl, token);
     if (!res.ok) {
       throw new Error(`Todoist API ${res.status}: ${await res.text()}`);
     }
@@ -117,11 +166,22 @@ async function fetchCompletedTasks() {
 }
 
 ipcMain.handle('fetch-tasks', async () => {
-  try {
-    return { ok: true, ...(await fetchCompletedTasks()) };
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
+  if (fullSyncInFlight) return fullSyncInFlight;
+
+  fullSyncInFlight = (async () => {
+    try {
+      const wait = Math.max(0, MIN_MS_BETWEEN_FULL_SYNCS - (Date.now() - lastFullSyncDone));
+      if (wait > 0) await sleep(wait);
+      return { ok: true, ...(await fetchCompletedTasks()) };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    } finally {
+      lastFullSyncDone = Date.now();
+      fullSyncInFlight = null;
+    }
+  })();
+
+  return fullSyncInFlight;
 });
 
 ipcMain.handle('get-cached', () => ({
@@ -144,9 +204,10 @@ ipcMain.handle('set-token', async (_e, token) => {
   }
   // Verify by hitting Todoist
   try {
-    const res = await fetch('https://api.todoist.com/api/v1/tasks/completed/by_completion_date?since=2026-05-10T00:00:00Z&until=2026-05-11T00:00:00Z&limit=1', {
-      headers: { Authorization: `Bearer ${clean}` }
-    });
+    const res = await todoistGet(
+      'https://api.todoist.com/api/v1/tasks/completed/by_completion_date?since=2026-05-10T00:00:00Z&until=2026-05-11T00:00:00Z&limit=1',
+      clean
+    );
     if (!res.ok) {
       return { ok: false, error: `Invalid token (HTTP ${res.status})` };
     }
@@ -157,15 +218,24 @@ ipcMain.handle('set-token', async (_e, token) => {
   return { ok: true };
 });
 
+ipcMain.handle('get-settings', () => ({
+  theme: store.get('theme'),
+  zoom: store.get('zoom')
+}));
+
+ipcMain.handle('set-settings', (_e, partial) => {
+  if (partial && typeof partial === 'object') {
+    if (typeof partial.theme === 'string') store.set('theme', partial.theme);
+    if (typeof partial.zoom === 'number' && partial.zoom > 0) store.set('zoom', partial.zoom);
+  }
+  return { ok: true };
+});
+
 ipcMain.handle('clear-token', () => {
   store.set('token', '');
   store.set('completed', []);
   store.set('lastFetched', 0);
   return { ok: true };
-});
-
-ipcMain.on('window-close', () => {
-  if (mainWindow) mainWindow.close();
 });
 
 ipcMain.on('open-external', (_e, url) => {

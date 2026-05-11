@@ -9,7 +9,6 @@
 <body>
   <div class="titlebar">
     <div class="drag-region"></div>
-    <button id="close-btn" class="close-btn" aria-label="Close">✕</button>
   </div>
   <main class="app">
     <div class="header">
@@ -19,8 +18,13 @@
         <button id="refresh-btn" class="refresh-btn" aria-label="Refresh">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.3L3 16"/><path d="M3 21v-5h5"/></svg>
         </button>
-        <button id="settings-btn" class="refresh-btn" aria-label="Settings" title="Settings">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        <button id="settings-btn" class="refresh-btn" type="button" aria-label="Settings" title="Settings">
+          <span class="settings-btn-icon settings-btn-icon--gear" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          </span>
+          <span class="settings-btn-icon settings-btn-icon--close" aria-hidden="true" hidden>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </span>
         </button>
       </div>
     </div>
@@ -29,12 +33,47 @@
       <div id="stats" class="stats"></div>
     </div>
     <div id="setup-view" class="setup" hidden>
-      <h2 class="setup-title">Connect Todoist</h2>
-      <p class="setup-help">Paste your Todoist API token. Stored locally on this machine only.</p>
-      <input id="token-input" class="token-input" type="password" placeholder="Todoist API token" autocomplete="off" spellcheck="false" />
+      <h2 class="setup-title">Settings</h2>
+
+      <div class="field">
+        <label class="field-label">Todoist API token</label>
+        <input id="token-input" class="token-input" type="password" placeholder="paste token here" autocomplete="off" spellcheck="false" />
+        <a id="token-link" class="setup-link" href="#">Get token →</a>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="theme-select">Theme</label>
+        <select id="theme-select" class="select">
+          <optgroup label="Default">
+            <option value="system">System (auto)</option>
+            <option value="github-light">GitHub Light</option>
+            <option value="github-dark">GitHub Dark</option>
+          </optgroup>
+          <optgroup label="Claude">
+            <option value="claude-light">Claude Light</option>
+            <option value="claude-dark">Claude Dark</option>
+          </optgroup>
+          <optgroup label="Premium">
+            <option value="github-dimmed">GitHub Dimmed</option>
+            <option value="dracula">Dracula</option>
+            <option value="halloween">Halloween</option>
+            <option value="winter">Winter</option>
+            <option value="solarized-dark">Solarized Dark</option>
+            <option value="sunset">Sunset</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="zoom-slider">Default zoom</label>
+        <div class="zoom-row">
+          <input id="zoom-slider" class="zoom-slider" type="range" min="80" max="200" step="5" value="100" aria-valuemin="80" aria-valuemax="200" />
+          <span id="zoom-value" class="zoom-value" aria-live="polite">100%</span>
+        </div>
+      </div>
+
       <div class="setup-actions">
         <button id="token-save" class="primary-btn">Save</button>
-        <a id="token-link" class="setup-link" href="#">Get token →</a>
       </div>
       <div id="setup-error" class="setup-error" hidden></div>
     </div>

@@ -5,24 +5,62 @@ const statsEl = document.getElementById('stats');
 const tooltipEl = document.getElementById('tooltip');
 const refreshBtn = document.getElementById('refresh-btn');
 const settingsBtn = document.getElementById('settings-btn');
+const settingsBtnIconGear = settingsBtn.querySelector('.settings-btn-icon--gear');
+const settingsBtnIconClose = settingsBtn.querySelector('.settings-btn-icon--close');
 const lastUpdatedEl = document.getElementById('last-updated');
-const closeBtn = document.getElementById('close-btn');
 const graphView = document.getElementById('graph-view');
 const setupView = document.getElementById('setup-view');
 const tokenInput = document.getElementById('token-input');
 const tokenSave = document.getElementById('token-save');
 const tokenLink = document.getElementById('token-link');
 const setupError = document.getElementById('setup-error');
+const themeSelect = document.getElementById('theme-select');
+const zoomSlider = document.getElementById('zoom-slider');
+const zoomValueEl = document.getElementById('zoom-value');
 
 const TOKEN_URL = 'https://app.todoist.com/app/settings/integrations/developer';
 
 let currentItems = [];
 let lastFetched = 0;
+let lastFetchError = null;
 let fetching = false;
 let hasToken = false;
+let settings = { theme: 'system', zoom: 1 };
+let systemDark = false;
 
-function applyTheme(dark) {
-  document.body.classList.toggle('dark', !!dark);
+function applyTheme(themeName) {
+  let effective = themeName;
+  if (themeName === 'system') {
+    effective = systemDark ? 'github-dark' : 'github-light';
+  }
+  document.body.dataset.theme = effective;
+}
+
+function applyZoom(factor) {
+  if (window.api?.setZoom) window.api.setZoom(factor);
+}
+
+function zoomFromSlider() {
+  return parseInt(zoomSlider.value, 10) / 100;
+}
+
+function syncZoomSlider(z) {
+  const pct = Math.min(200, Math.max(80, Math.round(Number(z) * 100 / 5) * 5));
+  zoomSlider.value = String(pct);
+  zoomSlider.setAttribute('aria-valuenow', String(pct));
+  zoomValueEl.textContent = `${pct}%`;
+}
+
+function setSettingsButtonMode(inSetup) {
+  settingsBtnIconGear.hidden = inSetup;
+  settingsBtnIconClose.hidden = !inSetup;
+  if (inSetup) {
+    settingsBtn.setAttribute('aria-label', 'Close settings');
+    settingsBtn.title = 'Close settings';
+  } else {
+    settingsBtn.setAttribute('aria-label', 'Settings');
+    settingsBtn.title = 'Settings';
+  }
 }
 
 function rerender() {
@@ -40,7 +78,17 @@ function fmtRelative(ts) {
 }
 
 function updateLastUpdated() {
-  lastUpdatedEl.textContent = fmtRelative(lastFetched);
+  if (lastFetchError) {
+    lastUpdatedEl.textContent = 'Fetch failed';
+    lastUpdatedEl.title = lastFetchError;
+    lastUpdatedEl.setAttribute('aria-label', `Fetch failed: ${lastFetchError}`);
+    lastUpdatedEl.classList.add('last-updated--error');
+  } else {
+    lastUpdatedEl.textContent = fmtRelative(lastFetched);
+    lastUpdatedEl.removeAttribute('title');
+    lastUpdatedEl.setAttribute('aria-label', lastUpdatedEl.textContent);
+    lastUpdatedEl.classList.remove('last-updated--error');
+  }
 }
 
 function showSetup(prefill = '') {
@@ -48,7 +96,10 @@ function showSetup(prefill = '') {
   setupView.hidden = false;
   refreshBtn.style.display = 'none';
   tokenInput.value = prefill;
+  themeSelect.value = settings.theme;
+  syncZoomSlider(settings.zoom);
   setupError.hidden = true;
+  setSettingsButtonMode(true);
   setTimeout(() => tokenInput.focus(), 50);
 }
 
@@ -56,6 +107,8 @@ function showGraph() {
   setupView.hidden = true;
   graphView.hidden = false;
   refreshBtn.style.display = '';
+  setSettingsButtonMode(false);
+  requestAnimationFrame(rerender);
 }
 
 async function refresh() {
@@ -65,16 +118,20 @@ async function refresh() {
   try {
     const res = await window.api.fetchTasks();
     if (res.ok) {
+      lastFetchError = null;
       currentItems = res.items;
       lastFetched = res.lastFetched;
       rerender();
       updateLastUpdated();
     } else if (res.error === 'NO_TOKEN') {
+      lastFetchError = null;
       hasToken = false;
       showSetup();
     } else {
-      console.error('Fetch failed:', res.error);
-      lastUpdatedEl.textContent = 'Fetch failed';
+      const detail = String(res.error || 'Unknown error');
+      console.error('Fetch failed:', detail);
+      lastFetchError = detail;
+      updateLastUpdated();
     }
   } finally {
     fetching = false;
@@ -82,30 +139,49 @@ async function refresh() {
   }
 }
 
-async function saveToken() {
+async function saveSettings() {
   const val = tokenInput.value.trim();
-  if (!val) {
+  const newTheme = themeSelect.value;
+  const newZoom = zoomFromSlider();
+
+  setupError.hidden = true;
+
+  // Persist theme + zoom always (cheap)
+  settings.theme = newTheme;
+  settings.zoom = newZoom;
+  applyTheme(newTheme);
+  applyZoom(newZoom);
+  await window.api.setSettings({ theme: newTheme, zoom: newZoom });
+
+  // Token: verify only when the value changed (same as stored → skip API check)
+  if (val) {
+    const existing = (await window.api.getToken()).trim();
+    if (val !== existing) {
+      tokenSave.disabled = true;
+      tokenSave.textContent = 'Verifying…';
+      try {
+        const res = await window.api.setToken(val);
+        if (!res.ok) {
+          setupError.textContent = res.error || 'Failed';
+          setupError.hidden = false;
+          return;
+        }
+        hasToken = true;
+      } finally {
+        tokenSave.disabled = false;
+        tokenSave.textContent = 'Save';
+      }
+    } else {
+      hasToken = true;
+    }
+  } else if (!hasToken) {
     setupError.textContent = 'Token required';
     setupError.hidden = false;
     return;
   }
-  tokenSave.disabled = true;
-  tokenSave.textContent = 'Verifying…';
-  setupError.hidden = true;
-  try {
-    const res = await window.api.setToken(val);
-    if (!res.ok) {
-      setupError.textContent = res.error || 'Failed';
-      setupError.hidden = false;
-      return;
-    }
-    hasToken = true;
-    showGraph();
-    refresh();
-  } finally {
-    tokenSave.disabled = false;
-    tokenSave.textContent = 'Save';
-  }
+
+  showGraph();
+  refresh();
 }
 
 async function bootstrap() {
@@ -114,8 +190,10 @@ async function bootstrap() {
     console.error('window.api missing — preload did not attach');
     return;
   }
-  const dark = await window.api.getTheme();
-  applyTheme(dark);
+  systemDark = await window.api.getTheme();
+  settings = await window.api.getSettings();
+  applyTheme(settings.theme);
+  applyZoom(settings.zoom);
 
   const token = await window.api.getToken();
   hasToken = !!token;
@@ -133,15 +211,29 @@ async function bootstrap() {
   refresh();
 }
 
-closeBtn.addEventListener('click', () => window.api.closeWindow());
 refreshBtn.addEventListener('click', refresh);
 settingsBtn.addEventListener('click', async () => {
+  if (!setupView.hidden) {
+    setupError.hidden = true;
+    showGraph();
+    return;
+  }
   const current = await window.api.getToken();
   showSetup(current);
 });
-tokenSave.addEventListener('click', saveToken);
+tokenSave.addEventListener('click', saveSettings);
 tokenInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') saveToken();
+  if (e.key === 'Enter') saveSettings();
+});
+themeSelect.addEventListener('change', () => {
+  // Live preview
+  applyTheme(themeSelect.value);
+});
+zoomSlider.addEventListener('input', () => {
+  const pct = parseInt(zoomSlider.value, 10);
+  zoomSlider.setAttribute('aria-valuenow', String(pct));
+  zoomValueEl.textContent = `${pct}%`;
+  applyZoom(zoomFromSlider());
 });
 tokenLink.addEventListener('click', (e) => {
   e.preventDefault();
@@ -152,7 +244,10 @@ window.addEventListener('resize', () => rerender());
 
 if (window.api) {
   window.api.onFocus(() => refresh());
-  window.api.onThemeChange((dark) => applyTheme(dark));
+  window.api.onThemeChange((dark) => {
+    systemDark = dark;
+    if (settings.theme === 'system') applyTheme('system');
+  });
 }
 
 setInterval(refresh, 15 * 60 * 1000);
