@@ -2,6 +2,7 @@
   "name": "todoist-graph",
   "version": "1.0.0",
   "description": "Todoist contribution graph desktop app",
+  "author": "Mohit Virli <virlimohit@gmail.com>",
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron .\"",

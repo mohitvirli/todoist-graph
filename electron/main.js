@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeTheme } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeTheme, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
@@ -11,7 +11,8 @@ const store = new Store({
   defaults: {
     bounds: { width: 720, height: 300, x: undefined, y: undefined },
     completed: [],
-    lastFetched: 0
+    lastFetched: 0,
+    token: ''
   }
 });
 
@@ -75,9 +76,9 @@ function createWindow() {
 }
 
 async function fetchCompletedTasks() {
-  const token = process.env.TODOIST_API_KEY;
+  const token = store.get('token') || process.env.TODOIST_API_KEY;
   if (!token || token === 'your_token_here') {
-    throw new Error('Missing TODOIST_API_KEY in .env');
+    throw new Error('NO_TOKEN');
   }
 
   const until = new Date();
@@ -130,8 +131,47 @@ ipcMain.handle('get-cached', () => ({
 
 ipcMain.handle('get-theme', () => nativeTheme.shouldUseDarkColors);
 
+ipcMain.handle('get-token', () => {
+  const t = store.get('token') || process.env.TODOIST_API_KEY || '';
+  return t && t !== 'your_token_here' ? t : '';
+});
+
+ipcMain.handle('set-token', async (_e, token) => {
+  const clean = String(token || '').trim();
+  if (!clean) {
+    store.set('token', '');
+    return { ok: false, error: 'Empty token' };
+  }
+  // Verify by hitting Todoist
+  try {
+    const res = await fetch('https://api.todoist.com/api/v1/tasks/completed/by_completion_date?since=2026-05-10T00:00:00Z&until=2026-05-11T00:00:00Z&limit=1', {
+      headers: { Authorization: `Bearer ${clean}` }
+    });
+    if (!res.ok) {
+      return { ok: false, error: `Invalid token (HTTP ${res.status})` };
+    }
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+  store.set('token', clean);
+  return { ok: true };
+});
+
+ipcMain.handle('clear-token', () => {
+  store.set('token', '');
+  store.set('completed', []);
+  store.set('lastFetched', 0);
+  return { ok: true };
+});
+
 ipcMain.on('window-close', () => {
   if (mainWindow) mainWindow.close();
+});
+
+ipcMain.on('open-external', (_e, url) => {
+  if (typeof url === 'string' && /^https?:\/\//.test(url)) {
+    shell.openExternal(url);
+  }
 });
 
 app.whenReady().then(() => {
