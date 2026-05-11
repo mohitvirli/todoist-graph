@@ -4,22 +4,35 @@
   "description": "Todoist contribution graph desktop app",
   "author": "Mohit Virli <virlimohit@gmail.com>",
   "main": "electron/main.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mohitvirli/todoist-graph.git"
+  },
   "scripts": {
     "dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "build:renderer": "vite build",
-    "build": "npm run build:renderer && electron-builder --mac dmg"
+    "build": "npm run build:renderer && electron-builder --mac dmg --arm64 --x64",
+    "release": "npm run build && gh release create v$npm_package_version dist-electron/*.dmg --generate-notes --title v$npm_package_version"
   },
   "build": {
     "appId": "com.mohitvirli.todoistgraph",
     "productName": "Todoist Graph",
+    "directories": {
+      "output": "dist-electron"
+    },
     "files": [
       "electron/**/*",
       "dist/**/*",
       "package.json"
     ],
     "mac": {
-      "target": "dmg",
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] }
+      ],
       "category": "public.app-category.productivity"
+    },
+    "dmg": {
+      "writeUpdateInfo": false
     }
   },
   "dependencies": {

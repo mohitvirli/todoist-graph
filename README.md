@@ -32,6 +32,32 @@ Optional: set `TODOIST_API_KEY` in a `.env` file for dev — used as fallback if
 
 Frameless, 720×300 default, min 400×220, resizable, drag via top 28px strip, ✕ closes. Bounds persisted. Dark/light follows system. Dock icon hidden on macOS.
 
+## Install (for users)
+
+1. Grab the latest `.dmg` from [Releases](https://github.com/mohitvirli/todoist-graph/releases) — pick `arm64` for Apple Silicon, `x64` for Intel.
+2. Open the `.dmg`, drag **Todoist Graph** to `/Applications`.
+3. First launch: macOS will block unsigned app. Right-click → **Open**, then **Open** again. (Or run once: `xattr -dr com.apple.quarantine "/Applications/Todoist Graph.app"`.)
+4. Paste your Todoist API token when prompted.
+
+To update: download the newer `.dmg`, drag-replace in `/Applications`. Settings persist at `~/Library/Application Support/todoist-graph/`.
+
+## Release (for maintainers)
+
+Requires `gh` CLI authenticated.
+
+```sh
+npm version patch          # bump + git tag
+npm run release            # build dmg + create GitHub Release
+git push --follow-tags     # push tag
+```
+
+`npm run release` runs:
+- `vite build` → renderer to `dist/`
+- `electron-builder --mac dmg --arm64 --x64` → `.dmg` artifacts in `dist-electron/`
+- `gh release create vX.Y.Z dist-electron/*.dmg --generate-notes`
+
+App is unsigned. If you ever pay for an Apple Developer cert, add `CSC_LINK`/`CSC_KEY_PASSWORD` env vars and `notarize` config; users stop seeing Gatekeeper prompt.
+
 ## Security
 
 API token never reaches the renderer process. All Todoist HTTP calls live in main; renderer talks only via IPC (`contextBridge`, `contextIsolation: true`, no `nodeIntegration`).
