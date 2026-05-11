@@ -152,7 +152,7 @@ export function render(graphEl, statsEl, items, tooltipEl, opts = {}) {
   statsEl.innerHTML = `
     <span><b>${stats.total}</b> completed</span>
     <span><b>${stats.streak}</b> day streak</span>
-    <span>Best day <b>${stats.bestDay.count}</b>${stats.bestDay.date ? ' (' + fmtDate(stats.bestDay.date) + ')' : ''}</span>
+    <span>Best day <b>${stats.bestDay.date ? fmtDate(stats.bestDay.date) : ''}</b> (${stats.bestDay.count} tasks)</span>
     <span><b>${stats.active}</b> active days</span>
   `;
 }

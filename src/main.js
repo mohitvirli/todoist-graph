@@ -21,6 +21,16 @@ const labelsToggle = document.getElementById('labels-toggle');
 
 const TOKEN_URL = 'https://app.todoist.com/app/settings/integrations/developer';
 
+const VALID_THEMES = new Set([
+  'system',
+  'github-light', 'github-dark',
+  'claude-light', 'claude-dark',
+  'todoist-light', 'todoist-dark',
+  'todoist-tangerine', 'todoist-moonstone', 'todoist-kale',
+  'todoist-lavender', 'todoist-raspberry', 'todoist-bubblegum',
+  'todoist-sunset', 'todoist-bordeaux', 'todoist-teal', 'todoist-pacific'
+]);
+
 let currentItems = [];
 let lastFetched = 0;
 let lastFetchError = null;
@@ -196,8 +206,9 @@ async function bootstrap() {
   }
   systemDark = await window.api.getTheme();
   const loaded = await window.api.getSettings();
+  const loadedTheme = loaded.theme && VALID_THEMES.has(loaded.theme) ? loaded.theme : 'system';
   settings = {
-    theme: loaded.theme || 'system',
+    theme: loadedTheme,
     zoom: typeof loaded.zoom === 'number' ? loaded.zoom : 1,
     showLabels: typeof loaded.showLabels === 'boolean' ? loaded.showLabels : true
   };
@@ -235,18 +246,28 @@ tokenInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') saveSettings();
 });
 themeSelect.addEventListener('change', () => {
-  // Live preview
-  applyTheme(themeSelect.value);
+  const v = themeSelect.value;
+  if (!VALID_THEMES.has(v)) return;
+  settings.theme = v;
+  applyTheme(v);
+  window.api.setSettings({ theme: v });
 });
 labelsToggle.addEventListener('change', () => {
-  settings.showLabels = !!labelsToggle.checked;
+  const v = !!labelsToggle.checked;
+  settings.showLabels = v;
   rerender();
+  window.api.setSettings({ showLabels: v });
 });
 zoomSlider.addEventListener('input', () => {
   const pct = parseInt(zoomSlider.value, 10);
   zoomSlider.setAttribute('aria-valuenow', String(pct));
   zoomValueEl.textContent = `${pct}%`;
   applyZoom(zoomFromSlider());
+});
+zoomSlider.addEventListener('change', () => {
+  const z = zoomFromSlider();
+  settings.zoom = z;
+  window.api.setSettings({ zoom: z });
 });
 tokenLink.addEventListener('click', (e) => {
   e.preventDefault();
