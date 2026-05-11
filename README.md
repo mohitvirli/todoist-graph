@@ -6,53 +6,109 @@ Tiny Electron desktop app. GitHub-style contribution heatmap of your Todoist com
 <img width="642" height="332" alt="image" src="https://github.com/user-attachments/assets/23b5148f-838c-4f33-88da-46f91ab1c8d5" />
 <img width="642" height="332" alt="image" src="https://github.com/user-attachments/assets/651940bc-3dfd-48fe-b673-25ca9674746a" />
 
+## Features
 
-## Setup
-
-1. `npm install`
-2. `npm run dev` — runs Vite + Electron
-3. On first launch, paste your Todoist API token. Token stored locally via `electron-store` (no `.env` needed). Get token at https://app.todoist.com/app/settings/integrations/developer — click the **Get token →** link in the app to open it.
-4. `npm run build` — packages a macOS `.dmg` via `electron-builder`
-
-Optional: set `TODOIST_API_KEY` in a `.env` file for dev — used as fallback if no stored token.
-
-## How it works
-
-- **Main process** (`electron/main.js`): owns the API token (kept in `electron-store`), calls Todoist API v1 (`/api/v1/tasks/completed/by_completion_date`, up to 200 items, last 3 months, cursor-paginated), caches raw items + window bounds, exposes IPC handlers.
-- **Preload** (`electron/preload.js`): `contextBridge` exposes `window.api.fetchTasks()`, `getCached()`, `getToken()`, `setToken()`, `clearToken()`, `getTheme()`, `closeWindow()`, `openExternal()`, focus/theme listeners.
-- **Renderer** (`src/`): vanilla JS. First-run shows setup view to enter token; otherwise boots from cache instantly, then refreshes in background. Re-fetches on window focus + every 15 min. Manual refresh button with spin. Gear icon reopens setup to update or clear token.
-- **Reflow**: graph computes `maxWeeks = floor((width + gap) / weekWidth)` on every render; `resize` re-renders so cells stay fixed (11px) and the column count adapts.
-
-## Window
-
-Frameless, 720×300 default, min 400×220, resizable, drag via top 28px strip, ✕ closes. Bounds persisted. Dark/light follows system. Dock icon hidden on macOS.
+- **At-a-glance heatmap** of completed Todoist tasks (last ~3 months, up to 200 items).
+- **Cache-first render** — graph paints from local cache instantly, then refreshes in the background. No loading spinner on launch.
+- **Auto-refresh** on window focus, every 15 minutes, and on demand via the refresh button.
+- **Themes** — System, GitHub Light/Dark, Claude Light/Dark, and the full Todoist palette (Todoist Light/Dark plus Tangerine Tango, Moonstone, Kale, Lavender, Raspberry Ripple, Bubblegum, Sunset, Bordeaux, Teal Tide, Pacific Sky).
+- **Zoom** (80%–200%) and optional **month / day-of-week labels**.
+- **Tooltip** on cell hover with date, count, and up to 4 task names.
+- **Stats row** — total completed, current streak, best day, active days.
+- **Responsive reflow** — drag to resize; cells stay fixed at 11px, weeks add/drop based on width.
+- **Frameless window** with a custom drag region. Bounds, theme, zoom, and labels preference all persist across launches.
+- **Token stays in the main process** — never reaches the renderer.
 
 ## Install (for users)
 
-1. Grab the latest `.dmg` from [Releases](https://github.com/mohitvirli/todoist-graph/releases) — pick `arm64` for Apple Silicon, `x64` for Intel.
+1. Grab the latest `.dmg` from [Releases](https://github.com/mohitvirli/todoist-graph/releases) — `arm64` for Apple Silicon, `x64` for Intel.
 2. Open the `.dmg`, drag **Todoist Graph** to `/Applications`.
-3. First launch: macOS will block unsigned app. Right-click → **Open**, then **Open** again. (Or run once: `xattr -dr com.apple.quarantine "/Applications/Todoist Graph.app"`.)
-4. Paste your Todoist API token when prompted.
+3. First launch: macOS will block the unsigned app. Right-click → **Open**, then **Open** again. (Or run once: `xattr -dr com.apple.quarantine "/Applications/Todoist Graph.app"`.)
+4. The Settings panel opens automatically on first run. Paste your Todoist API token and hit Save.
+   - Click **Get token →** to open Todoist's developer page in your browser.
+   - Direct link: <https://app.todoist.com/app/settings/integrations/developer>
 
 To update: download the newer `.dmg`, drag-replace in `/Applications`. Settings persist at `~/Library/Application Support/todoist-graph/`.
 
+## Settings
+
+Open via the gear icon (top-right). Closes via the same icon.
+
+| Setting | What it does |
+|---------|--------------|
+| **Todoist API token** | Personal token. Verified against Todoist on save. Stored locally only. |
+| **Theme** | Pick from System / GitHub / Claude / Todoist palettes. Applies live. Autosaved. |
+| **Show month and day labels** | Toggles labels around the heatmap (Jan / Feb / …, Mon / Wed / Fri). Autosaved. |
+| **Default zoom** | 80%–200% slider. Applies live. Autosaved. |
+
+Display settings autosave on change — no need to click Save unless you're changing the token.
+
+## Color scale
+
+| Tasks | Cell |
+|-------|------|
+| 0     | muted |
+| 1     | lightest |
+| 2–3   | mid |
+| 4–7   | strong |
+| 8+    | brightest |
+
+The exact hues come from the active theme.
+
+## How it works
+
+- **Main process** (`electron/main.js`): owns the API token (kept in `electron-store`), calls Todoist API v1 (`/api/v1/tasks/completed/by_completion_date`, up to 200 items, last 3 months, cursor-paginated, rate-limit-aware with 429 backoff), caches raw items + window bounds + UI settings, exposes IPC handlers.
+- **Preload** (`electron/preload.js`): `contextBridge` exposes `window.api.fetchTasks()`, `getCached()`, `getToken()`, `setToken()`, `clearToken()`, `getSettings()`, `setSettings()`, `setZoom()`, `getTheme()`, `openExternal()`, plus focus and theme listeners.
+- **Renderer** (`src/`): vanilla JS — no framework. First-run shows the Settings view to enter a token; otherwise boots from cache instantly, then refreshes in background.
+- **Reflow**: graph computes `maxWeeks = floor((width + gap) / weekWidth)` on every render; `resize` re-renders so cells stay fixed (11px) and the column count adapts.
+- **Security**: `contextIsolation: true`, no `nodeIntegration`. The token never reaches the renderer — all Todoist HTTP calls live in main.
+
+## Develop
+
+Requirements: Node 18+, macOS (for `.dmg` packaging).
+
+```sh
+npm install
+npm run dev           # Vite renderer + Electron
+```
+
+Optional: set `TODOIST_API_KEY` in a `.env` for dev — used as a fallback if no stored token exists.
+
+Project layout:
+
+```
+todoist-graph/
+├── electron/
+│   ├── main.js        # Electron main process — IPC, Todoist HTTP, store
+│   └── preload.js     # contextBridge bridge to renderer
+└── src/
+    ├── index.html
+    ├── main.js        # renderer entry — boots, wires events
+    ├── graph.js       # heatmap rendering + reflow
+    └── style.css      # theme variables + layout
+```
+
 ## Release (for maintainers)
 
-Requires `gh` CLI authenticated.
+Requires the `gh` CLI authenticated and Apple Silicon + Intel build capability (any Mac).
 
 ```sh
 npm version patch          # bump + git tag
 npm run release            # build dmg + create GitHub Release
-git push --follow-tags     # push tag
+git push --follow-tags
 ```
 
 `npm run release` runs:
-- `vite build` → renderer to `dist/`
+- `vite build` → renderer into `dist/`
 - `electron-builder --mac dmg --arm64 --x64` → `.dmg` artifacts in `dist-electron/`
 - `gh release create vX.Y.Z dist-electron/*.dmg --generate-notes`
 
-App is unsigned. If you ever pay for an Apple Developer cert, add `CSC_LINK`/`CSC_KEY_PASSWORD` env vars and `notarize` config; users stop seeing Gatekeeper prompt.
+The app is unsigned. If you ever obtain an Apple Developer cert, add `CSC_LINK` / `CSC_KEY_PASSWORD` and a `notarize` config — users stop seeing the Gatekeeper prompt.
 
-## Security
+## Window
 
-API token never reaches the renderer process. All Todoist HTTP calls live in main; renderer talks only via IPC (`contextBridge`, `contextIsolation: true`, no `nodeIntegration`).
+Frameless, 720×300 default, min 400×220, resizable. Drag from the top 28px strip. Bounds, theme, zoom, and labels preference all persist. Dock icon hidden on macOS — no tray.
+
+## License
+
+MIT.
