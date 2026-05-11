@@ -1,6 +1,6 @@
 {
   "name": "todoist-graph",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Todoist contribution graph desktop app",
   "author": "Mohit Virli <virlimohit@gmail.com>",
   "main": "electron/main.js",
@@ -27,7 +27,13 @@
     ],
     "mac": {
       "target": [
-        { "target": "dmg", "arch": ["arm64", "x64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ],
       "category": "public.app-category.productivity"
     },
