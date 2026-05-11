@@ -1,0 +1,35 @@
+{
+  "name": "todoist-graph",
+  "version": "1.0.0",
+  "description": "Todoist contribution graph desktop app",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "build:renderer": "vite build",
+    "build": "npm run build:renderer && electron-builder --mac dmg"
+  },
+  "build": {
+    "appId": "com.mohitvirli.todoistgraph",
+    "productName": "Todoist Graph",
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.productivity"
+    }
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "electron-store": "^8.2.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "vite": "^5.4.10",
+    "wait-on": "^8.0.1"
+  }
+}
