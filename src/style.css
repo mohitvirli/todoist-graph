@@ -245,12 +245,51 @@ html, body {
 .graph {
   flex: 0 0 auto;
   display: flex;
+  flex-direction: column;
   gap: 3px;
   overflow: hidden;
   align-items: flex-start;
   justify-content: flex-start;
   min-height: 0;
 }
+.graph-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.weeks {
+  display: flex;
+  gap: 3px;
+  position: relative;
+}
+.month-labels {
+  position: relative;
+  height: 13px;
+  font-size: 9.5px;
+  color: var(--muted);
+  margin-left: var(--day-labels-w, 0);
+  flex: 0 0 auto;
+}
+.month-label {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
+}
+.day-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 9.5px;
+  color: var(--muted);
+  width: var(--day-labels-w, 22px);
+  flex: 0 0 auto;
+}
+.day-label {
+  height: 11px;
+  line-height: 11px;
+  white-space: nowrap;
+}
+.day-label--empty { visibility: hidden; }
 
 .setup {
   flex: 1;
@@ -288,6 +327,22 @@ html, body {
   cursor: pointer;
 }
 .select:focus { border-color: var(--accent); }
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--fg);
+  cursor: pointer;
+  user-select: none;
+}
+.toggle-row input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
 
 .zoom-row {
   display: flex;

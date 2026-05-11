@@ -17,6 +17,7 @@ const setupError = document.getElementById('setup-error');
 const themeSelect = document.getElementById('theme-select');
 const zoomSlider = document.getElementById('zoom-slider');
 const zoomValueEl = document.getElementById('zoom-value');
+const labelsToggle = document.getElementById('labels-toggle');
 
 const TOKEN_URL = 'https://app.todoist.com/app/settings/integrations/developer';
 
@@ -25,7 +26,7 @@ let lastFetched = 0;
 let lastFetchError = null;
 let fetching = false;
 let hasToken = false;
-let settings = { theme: 'system', zoom: 1 };
+let settings = { theme: 'system', zoom: 1, showLabels: true };
 let systemDark = false;
 
 function applyTheme(themeName) {
@@ -64,7 +65,7 @@ function setSettingsButtonMode(inSetup) {
 }
 
 function rerender() {
-  render(graphEl, statsEl, currentItems, tooltipEl);
+  render(graphEl, statsEl, currentItems, tooltipEl, { showLabels: settings.showLabels });
 }
 
 function fmtRelative(ts) {
@@ -98,6 +99,7 @@ function showSetup(prefill = '') {
   tokenInput.value = prefill;
   themeSelect.value = settings.theme;
   syncZoomSlider(settings.zoom);
+  labelsToggle.checked = !!settings.showLabels;
   setupError.hidden = true;
   setSettingsButtonMode(true);
   setTimeout(() => tokenInput.focus(), 50);
@@ -143,15 +145,17 @@ async function saveSettings() {
   const val = tokenInput.value.trim();
   const newTheme = themeSelect.value;
   const newZoom = zoomFromSlider();
+  const newShowLabels = !!labelsToggle.checked;
 
   setupError.hidden = true;
 
-  // Persist theme + zoom always (cheap)
+  // Persist display settings (cheap)
   settings.theme = newTheme;
   settings.zoom = newZoom;
+  settings.showLabels = newShowLabels;
   applyTheme(newTheme);
   applyZoom(newZoom);
-  await window.api.setSettings({ theme: newTheme, zoom: newZoom });
+  await window.api.setSettings({ theme: newTheme, zoom: newZoom, showLabels: newShowLabels });
 
   // Token: verify only when the value changed (same as stored → skip API check)
   if (val) {
@@ -191,7 +195,12 @@ async function bootstrap() {
     return;
   }
   systemDark = await window.api.getTheme();
-  settings = await window.api.getSettings();
+  const loaded = await window.api.getSettings();
+  settings = {
+    theme: loaded.theme || 'system',
+    zoom: typeof loaded.zoom === 'number' ? loaded.zoom : 1,
+    showLabels: typeof loaded.showLabels === 'boolean' ? loaded.showLabels : true
+  };
   applyTheme(settings.theme);
   applyZoom(settings.zoom);
 
@@ -228,6 +237,10 @@ tokenInput.addEventListener('keydown', (e) => {
 themeSelect.addEventListener('change', () => {
   // Live preview
   applyTheme(themeSelect.value);
+});
+labelsToggle.addEventListener('change', () => {
+  settings.showLabels = !!labelsToggle.checked;
+  rerender();
 });
 zoomSlider.addEventListener('input', () => {
   const pct = parseInt(zoomSlider.value, 10);

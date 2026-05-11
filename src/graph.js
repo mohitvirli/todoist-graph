@@ -1,6 +1,11 @@
 const CELL_SIZE = 11;
 const GAP = 3;
 const WEEK_WIDTH = CELL_SIZE + GAP;
+const DAY_LABEL_WIDTH = 22; // px reserved for "Mon"/"Wed"/"Fri" column
+const MONTH_LABEL_HEIGHT = 13;
+
+const DAY_NAMES = ['', 'Mon', '', 'Wed', '', 'Fri', '']; // Sun-Sat, only odd rows
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function ymd(d) {
   const y = d.getFullYear();
@@ -51,16 +56,17 @@ export function computeStats(byDate) {
   return { total, active, bestDay, streak };
 }
 
-export function render(graphEl, statsEl, items, tooltipEl) {
+export function render(graphEl, statsEl, items, tooltipEl, opts = {}) {
+  const showLabels = !!opts.showLabels;
   const byDate = aggregate(items);
 
-  const width = graphEl.clientWidth || 600;
-  const maxWeeks = Math.max(4, Math.floor((width + GAP) / WEEK_WIDTH));
+  const totalWidth = graphEl.clientWidth || 600;
+  const cellsAreaWidth = showLabels ? Math.max(0, totalWidth - DAY_LABEL_WIDTH - 4) : totalWidth;
+  const maxWeeks = Math.max(4, Math.floor((cellsAreaWidth + GAP) / WEEK_WIDTH));
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // last column = current week. Find Saturday of current week (Sun-Sat layout)
   const endSat = new Date(today);
   endSat.setDate(today.getDate() + (6 - today.getDay()));
 
@@ -68,6 +74,52 @@ export function render(graphEl, statsEl, items, tooltipEl) {
   startSun.setDate(endSat.getDate() - (maxWeeks * 7 - 1));
 
   graphEl.innerHTML = '';
+  graphEl.style.setProperty('--day-labels-w', showLabels ? `${DAY_LABEL_WIDTH}px` : '0px');
+
+  // Month-label row (above grid)
+  if (showLabels) {
+    const monthRow = document.createElement('div');
+    monthRow.className = 'month-labels';
+    monthRow.style.width = `${maxWeeks * WEEK_WIDTH - GAP}px`;
+    monthRow.style.height = `${MONTH_LABEL_HEIGHT}px`;
+
+    let lastMonth = -1;
+    for (let w = 0; w < maxWeeks; w++) {
+      // Use first day of week (Sunday) as anchor
+      const firstDay = new Date(startSun);
+      firstDay.setDate(startSun.getDate() + w * 7);
+      const month = firstDay.getMonth();
+      if (month !== lastMonth) {
+        // Only place a label if there's enough room before the next month
+        const label = document.createElement('span');
+        label.className = 'month-label';
+        label.textContent = MONTH_NAMES[month];
+        label.style.left = `${w * WEEK_WIDTH}px`;
+        monthRow.appendChild(label);
+        lastMonth = month;
+      }
+    }
+    graphEl.appendChild(monthRow);
+  }
+
+  // Row: [day labels] [weeks]
+  const row = document.createElement('div');
+  row.className = 'graph-row';
+
+  if (showLabels) {
+    const dayCol = document.createElement('div');
+    dayCol.className = 'day-labels';
+    for (let d = 0; d < 7; d++) {
+      const lab = document.createElement('div');
+      lab.className = 'day-label' + (DAY_NAMES[d] ? '' : ' day-label--empty');
+      lab.textContent = DAY_NAMES[d] || '·';
+      dayCol.appendChild(lab);
+    }
+    row.appendChild(dayCol);
+  }
+
+  const weeks = document.createElement('div');
+  weeks.className = 'weeks';
 
   for (let w = 0; w < maxWeeks; w++) {
     const weekEl = document.createElement('div');
@@ -90,8 +142,11 @@ export function render(graphEl, statsEl, items, tooltipEl) {
       }
       weekEl.appendChild(cell);
     }
-    graphEl.appendChild(weekEl);
+    weeks.appendChild(weekEl);
   }
+
+  row.appendChild(weeks);
+  graphEl.appendChild(row);
 
   const stats = computeStats(byDate);
   statsEl.innerHTML = `

@@ -14,7 +14,8 @@ const store = new Store({
     lastFetched: 0,
     token: '',
     theme: 'system',
-    zoom: 1.0
+    zoom: 1.0,
+    showLabels: true
   }
 });
 
@@ -220,13 +221,15 @@ ipcMain.handle('set-token', async (_e, token) => {
 
 ipcMain.handle('get-settings', () => ({
   theme: store.get('theme'),
-  zoom: store.get('zoom')
+  zoom: store.get('zoom'),
+  showLabels: store.get('showLabels')
 }));
 
 ipcMain.handle('set-settings', (_e, partial) => {
   if (partial && typeof partial === 'object') {
     if (typeof partial.theme === 'string') store.set('theme', partial.theme);
     if (typeof partial.zoom === 'number' && partial.zoom > 0) store.set('zoom', partial.zoom);
+    if (typeof partial.showLabels === 'boolean') store.set('showLabels', partial.showLabels);
   }
   return { ok: true };
 });
