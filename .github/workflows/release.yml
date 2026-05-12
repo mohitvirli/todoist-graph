@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run build:renderer
+      - run: npx electron-builder --mac dmg --arm64 --x64
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist-electron/*.dmg
+          generate_release_notes: true
+
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run build:renderer
+      - run: npx electron-builder --win nsis --x64
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist-electron/*.exe
+          generate_release_notes: true
