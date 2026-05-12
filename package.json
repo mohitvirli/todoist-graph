@@ -1,6 +1,6 @@
 {
   "name": "todoist-graph",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Todoist contribution graph desktop app",
   "author": "Mohit Virli <virlimohit@gmail.com>",
   "main": "electron/main.js",
