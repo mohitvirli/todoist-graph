@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.0.2)'
+        required: true
 
 jobs:
   build-mac:
@@ -17,7 +22,7 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm run build:renderer
-      - run: npx electron-builder --mac dmg --arm64 --x64
+      - run: npx electron-builder --mac dmg --arm64 --x64 --publish never
       - uses: softprops/action-gh-release@v2
         with:
           files: dist-electron/*.dmg
@@ -36,7 +41,7 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm run build:renderer
-      - run: npx electron-builder --win nsis --x64
+      - run: npx electron-builder --win nsis --x64 --publish never
       - uses: softprops/action-gh-release@v2
         with:
           files: dist-electron/*.exe
