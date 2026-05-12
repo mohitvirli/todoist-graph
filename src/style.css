@@ -252,6 +252,26 @@ html, body {
   -webkit-app-region: drag;
 }
 
+.close-btn {
+  position: relative;
+  z-index: 1;
+  -webkit-app-region: no-drag;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.close-btn:hover {
+  background: #e81123;
+  color: #fff;
+}
+
 .app {
   padding: 10px 14px 12px;
   height: calc(100vh - 28px);

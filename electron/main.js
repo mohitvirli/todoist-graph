@@ -247,6 +247,10 @@ ipcMain.on('open-external', (_e, url) => {
   }
 });
 
+ipcMain.on('window-close', () => {
+  if (win) win.close();
+});
+
 app.whenReady().then(() => {
   if (process.platform === 'darwin' && app.dock) app.dock.hide();
   createWindow();

@@ -15,6 +15,8 @@ try {
       if (f > 0) webFrame.setZoomFactor(f);
     },
     openExternal: (url) => ipcRenderer.send('open-external', url),
+    closeWindow: () => ipcRenderer.send('window-close'),
+    platform: process.platform,
     onFocus: (cb) => ipcRenderer.on('window-focus', cb),
     onThemeChange: (cb) => ipcRenderer.on('theme-change', (_e, dark) => cb(dark))
   });

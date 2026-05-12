@@ -19,6 +19,8 @@ const zoomSlider = document.getElementById('zoom-slider');
 const zoomValueEl = document.getElementById('zoom-value');
 const labelsToggle = document.getElementById('labels-toggle');
 
+const closeBtn = document.getElementById('close-btn');
+
 const TOKEN_URL = 'https://app.todoist.com/app/settings/integrations/developer';
 
 const VALID_THEMES = new Set([
@@ -286,5 +288,11 @@ if (window.api) {
 
 setInterval(refresh, 15 * 60 * 1000);
 setInterval(updateLastUpdated, 30 * 1000);
+
+// Show close button on Windows (frameless — no native controls)
+if (window.api?.platform === 'win32') {
+  closeBtn.hidden = false;
+  closeBtn.addEventListener('click', () => window.api.closeWindow());
+}
 
 bootstrap();
