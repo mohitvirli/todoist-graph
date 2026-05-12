@@ -22,6 +22,8 @@ jobs:
         with:
           files: dist-electron/*.dmg
           generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-windows:
     runs-on: windows-latest
@@ -39,3 +41,5 @@ jobs:
         with:
           files: dist-electron/*.exe
           generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
