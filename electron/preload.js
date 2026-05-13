@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
 try {
   contextBridge.exposeInMainWorld('api', {
-    fetchTasks: () => ipcRenderer.invoke('fetch-tasks'),
+    fetchTasks: (range) => ipcRenderer.invoke('fetch-tasks', range),
     getCached: () => ipcRenderer.invoke('get-cached'),
     getTheme: () => ipcRenderer.invoke('get-theme'),
     getToken: () => ipcRenderer.invoke('get-token'),

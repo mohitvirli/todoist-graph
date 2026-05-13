@@ -22,6 +22,27 @@ function level(count) {
   return 4;
 }
 
+export function computeGraphRange(graphEl, opts = {}) {
+  const showLabels = !!opts.showLabels;
+  const totalWidth = graphEl.clientWidth || 600;
+  const cellsAreaWidth = showLabels ? Math.max(0, totalWidth - DAY_LABEL_WIDTH - 4) : totalWidth;
+  const weeks = Math.max(4, Math.floor((cellsAreaWidth + GAP) / WEEK_WIDTH));
+
+  const today = opts.today ? new Date(opts.today) : new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const endSat = new Date(today);
+  endSat.setDate(today.getDate() + (6 - today.getDay()));
+
+  const start = new Date(endSat);
+  start.setDate(endSat.getDate() - (weeks * 7 - 1));
+
+  const until = new Date(endSat);
+  until.setDate(endSat.getDate() + 1);
+
+  return { start, until, weeks, today };
+}
+
 export function aggregate(items) {
   const byDate = new Map();
   for (const it of items) {
@@ -59,19 +80,7 @@ export function computeStats(byDate) {
 export function render(graphEl, statsEl, items, tooltipEl, opts = {}) {
   const showLabels = !!opts.showLabels;
   const byDate = aggregate(items);
-
-  const totalWidth = graphEl.clientWidth || 600;
-  const cellsAreaWidth = showLabels ? Math.max(0, totalWidth - DAY_LABEL_WIDTH - 4) : totalWidth;
-  const maxWeeks = Math.max(4, Math.floor((cellsAreaWidth + GAP) / WEEK_WIDTH));
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const endSat = new Date(today);
-  endSat.setDate(today.getDate() + (6 - today.getDay()));
-
-  const startSun = new Date(endSat);
-  startSun.setDate(endSat.getDate() - (maxWeeks * 7 - 1));
+  const { start: startSun, weeks: maxWeeks, today } = computeGraphRange(graphEl, { showLabels });
 
   graphEl.innerHTML = '';
   graphEl.style.setProperty('--day-labels-w', showLabels ? `${DAY_LABEL_WIDTH}px` : '0px');

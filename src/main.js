@@ -1,4 +1,4 @@
-import { render } from './graph.js';
+import { computeGraphRange, render } from './graph.js';
 
 const graphEl = document.getElementById('graph');
 const statsEl = document.getElementById('stats');
@@ -34,9 +34,11 @@ const VALID_THEMES = new Set([
 ]);
 
 let currentItems = [];
+let completedRange = null;
 let lastFetched = 0;
 let lastFetchError = null;
 let fetching = false;
+let refreshQueued = false;
 let hasToken = false;
 let settings = { theme: 'system', zoom: 1, showLabels: true };
 let systemDark = false;
@@ -76,8 +78,42 @@ function setSettingsButtonMode(inSetup) {
   }
 }
 
+function apiDate(d) {
+  return d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+function visibleRange() {
+  const range = computeGraphRange(graphEl, { showLabels: settings.showLabels });
+  return {
+    since: apiDate(range.start),
+    until: apiDate(range.until)
+  };
+}
+
+function rangeCovers(outer, inner) {
+  if (!outer || !inner) return false;
+  const outerSince = Date.parse(outer.since);
+  const outerUntil = Date.parse(outer.until);
+  const innerSince = Date.parse(inner.since);
+  const innerUntil = Date.parse(inner.until);
+  return [outerSince, outerUntil, innerSince, innerUntil].every(Number.isFinite)
+    && outerSince <= innerSince
+    && outerUntil >= innerUntil;
+}
+
+function itemsForRange(items, range) {
+  const since = Date.parse(range.since);
+  const until = Date.parse(range.until);
+  if (!Number.isFinite(since) || !Number.isFinite(until)) return items;
+  return items.filter((item) => {
+    const completedAt = Date.parse(item.completed_at);
+    return Number.isFinite(completedAt) && completedAt >= since && completedAt < until;
+  });
+}
+
 function rerender() {
-  render(graphEl, statsEl, currentItems, tooltipEl, { showLabels: settings.showLabels });
+  const range = visibleRange();
+  render(graphEl, statsEl, itemsForRange(currentItems, range), tooltipEl, { showLabels: settings.showLabels });
 }
 
 function fmtRelative(ts) {
@@ -125,15 +161,23 @@ function showGraph() {
   requestAnimationFrame(rerender);
 }
 
-async function refresh() {
-  if (!hasToken || fetching) return;
+async function refresh({ force = true } = {}) {
+  if (!hasToken) return;
+  if (fetching) {
+    refreshQueued = true;
+    return;
+  }
+  const range = visibleRange();
+  if (!force && rangeCovers(completedRange, range)) return;
+
   fetching = true;
   refreshBtn.classList.add('spin');
   try {
-    const res = await window.api.fetchTasks();
+    const res = await window.api.fetchTasks(range);
     if (res.ok) {
       lastFetchError = null;
       currentItems = res.items;
+      completedRange = res.completedRange || range;
       lastFetched = res.lastFetched;
       rerender();
       updateLastUpdated();
@@ -150,7 +194,15 @@ async function refresh() {
   } finally {
     fetching = false;
     refreshBtn.classList.remove('spin');
+    if (refreshQueued) {
+      refreshQueued = false;
+      setTimeout(refreshIfNeeded, 0);
+    }
   }
+}
+
+function refreshIfNeeded() {
+  refresh({ force: false });
 }
 
 async function saveSettings() {
@@ -227,13 +279,14 @@ async function bootstrap() {
 
   const cached = await window.api.getCached();
   currentItems = cached.items || [];
+  completedRange = cached.completedRange || null;
   lastFetched = cached.lastFetched || 0;
   rerender();
   updateLastUpdated();
-  refresh();
+  refresh({ force: !rangeCovers(completedRange, visibleRange()) });
 }
 
-refreshBtn.addEventListener('click', refresh);
+refreshBtn.addEventListener('click', () => refresh());
 settingsBtn.addEventListener('click', async () => {
   if (!setupView.hidden) {
     setupError.hidden = true;
@@ -258,6 +311,7 @@ labelsToggle.addEventListener('change', () => {
   const v = !!labelsToggle.checked;
   settings.showLabels = v;
   rerender();
+  refreshIfNeeded();
   window.api.setSettings({ showLabels: v });
 });
 zoomSlider.addEventListener('input', () => {
@@ -276,7 +330,12 @@ tokenLink.addEventListener('click', (e) => {
   window.api.openExternal(TOKEN_URL);
 });
 
-window.addEventListener('resize', () => rerender());
+let resizeRefreshTimer = null;
+window.addEventListener('resize', () => {
+  rerender();
+  clearTimeout(resizeRefreshTimer);
+  resizeRefreshTimer = setTimeout(refreshIfNeeded, 200);
+});
 
 if (window.api) {
   window.api.onFocus(() => refresh());

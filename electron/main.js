@@ -11,6 +11,7 @@ const store = new Store({
   defaults: {
     bounds: { width: 720, height: 300, x: undefined, y: undefined },
     completed: [],
+    completedRange: null,
     lastFetched: 0,
     token: '',
     theme: 'system',
@@ -34,6 +35,51 @@ let fullSyncInFlight = null;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function fmtTodoistDate(d) {
+  return d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+function parseRequestedRange(range) {
+  if (!range || typeof range !== 'object') {
+    throw new Error('Missing fetch range');
+  }
+
+  const since = new Date(range.since);
+  const until = new Date(range.until);
+  if (!Number.isFinite(since.getTime()) || !Number.isFinite(until.getTime())) {
+    throw new Error('Invalid fetch range');
+  }
+  if (since >= until) {
+    throw new Error('Fetch range must end after it starts');
+  }
+
+  return { since, until };
+}
+
+function addMonthsClamped(date, months) {
+  const next = new Date(date);
+  const originalDay = next.getDate();
+  next.setDate(1);
+  next.setMonth(next.getMonth() + months);
+  const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+  next.setDate(Math.min(originalDay, lastDay));
+  return next;
+}
+
+function chunkCompletionRange(since, until) {
+  const chunks = [];
+  let chunkSince = new Date(since);
+
+  while (chunkSince < until) {
+    const chunkUntil = addMonthsClamped(chunkSince, 3);
+    if (chunkUntil > until) chunkUntil.setTime(until.getTime());
+    chunks.push({ since: new Date(chunkSince), until: new Date(chunkUntil) });
+    chunkSince = chunkUntil;
+  }
+
+  return chunks;
 }
 
 function enqueueTodoistRequest(fn) {
@@ -127,20 +173,10 @@ function createWindow() {
   });
 }
 
-async function fetchCompletedTasks() {
-  const token = store.get('token') || process.env.TODOIST_API_KEY;
-  if (!token || token === 'your_token_here') {
-    throw new Error('NO_TOKEN');
-  }
-
-  const until = new Date();
-  const since = new Date();
-  since.setMonth(since.getMonth() - 3);
-  const fmt = (d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
-
+async function fetchCompletedPage(token, since, until) {
   const params = new URLSearchParams({
-    since: fmt(since),
-    until: fmt(until),
+    since: fmtTodoistDate(since),
+    until: fmtTodoistDate(until),
     limit: '200'
   });
   const url = `https://api.todoist.com/api/v1/tasks/completed/by_completion_date?${params}`;
@@ -156,24 +192,45 @@ async function fetchCompletedTasks() {
     const data = await res.json();
     for (const it of (data.items || [])) {
       items.push({ id: it.id, content: it.content, completed_at: it.completed_at });
-      if (items.length >= 200) break;
     }
     cursor = data.next_cursor || null;
-  } while (cursor && items.length < 200);
+  } while (cursor);
 
-  store.set('completed', items);
-  store.set('lastFetched', Date.now());
-  return { items, lastFetched: Date.now() };
+  return items;
 }
 
-ipcMain.handle('fetch-tasks', async () => {
+async function fetchCompletedTasks(range) {
+  const token = store.get('token') || process.env.TODOIST_API_KEY;
+  if (!token || token === 'your_token_here') {
+    throw new Error('NO_TOKEN');
+  }
+
+  const { since, until } = parseRequestedRange(range);
+  const byId = new Map();
+  for (const chunk of chunkCompletionRange(since, until)) {
+    const pageItems = await fetchCompletedPage(token, chunk.since, chunk.until);
+    for (const item of pageItems) {
+      byId.set(String(item.id), item);
+    }
+  }
+
+  const items = Array.from(byId.values());
+  const completedRange = { since: fmtTodoistDate(since), until: fmtTodoistDate(until) };
+  const lastFetched = Date.now();
+  store.set('completed', items);
+  store.set('completedRange', completedRange);
+  store.set('lastFetched', lastFetched);
+  return { items, completedRange, lastFetched };
+}
+
+ipcMain.handle('fetch-tasks', async (_e, range) => {
   if (fullSyncInFlight) return fullSyncInFlight;
 
   fullSyncInFlight = (async () => {
     try {
       const wait = Math.max(0, MIN_MS_BETWEEN_FULL_SYNCS - (Date.now() - lastFullSyncDone));
       if (wait > 0) await sleep(wait);
-      return { ok: true, ...(await fetchCompletedTasks()) };
+      return { ok: true, ...(await fetchCompletedTasks(range)) };
     } catch (err) {
       return { ok: false, error: err.message };
     } finally {
@@ -187,6 +244,7 @@ ipcMain.handle('fetch-tasks', async () => {
 
 ipcMain.handle('get-cached', () => ({
   items: store.get('completed'),
+  completedRange: store.get('completedRange'),
   lastFetched: store.get('lastFetched')
 }));
 
@@ -237,6 +295,7 @@ ipcMain.handle('set-settings', (_e, partial) => {
 ipcMain.handle('clear-token', () => {
   store.set('token', '');
   store.set('completed', []);
+  store.set('completedRange', null);
   store.set('lastFetched', 0);
   return { ok: true };
 });

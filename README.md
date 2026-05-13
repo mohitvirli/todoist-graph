@@ -1,6 +1,6 @@
 # Todoist Graph
 
-Tiny Electron desktop app. GitHub-style contribution heatmap of your Todoist completions over the last 3 months.
+Tiny Electron desktop app. GitHub-style contribution heatmap of your visible Todoist completion history.
 
 ## Demo
 <img width="642" height="332" alt="image" src="https://github.com/user-attachments/assets/23b5148f-838c-4f33-88da-46f91ab1c8d5" />
@@ -8,8 +8,8 @@ Tiny Electron desktop app. GitHub-style contribution heatmap of your Todoist com
 
 ## Features
 
-- **At-a-glance heatmap** of completed Todoist tasks (last ~3 months, up to 200 items).
-- **Cache-first render** — graph paints from local cache instantly, then refreshes in the background. No loading spinner on launch.
+- **At-a-glance heatmap** of completed Todoist tasks for the full visible graph range.
+- **Cache-first render** — graph paints from local cache instantly, then fetches when the visible range needs data. No loading spinner on launch.
 - **Auto-refresh** on window focus, every 15 minutes, and on demand via the refresh button.
 - **Themes** — System, GitHub Light/Dark, Claude Light/Dark, and the full Todoist palette (Todoist Light/Dark plus Tangerine Tango, Moonstone, Kale, Lavender, Raspberry Ripple, Bubblegum, Sunset, Bordeaux, Teal Tide, Pacific Sky).
 - **Zoom** (80%–200%) and optional **month / day-of-week labels**.
@@ -57,10 +57,10 @@ The exact hues come from the active theme.
 
 ## How it works
 
-- **Main process** (`electron/main.js`): owns the API token (kept in `electron-store`), calls Todoist API v1 (`/api/v1/tasks/completed/by_completion_date`, up to 200 items, last 3 months, cursor-paginated, rate-limit-aware with 429 backoff), caches raw items + window bounds + UI settings, exposes IPC handlers.
+- **Main process** (`electron/main.js`): owns the API token (kept in `electron-store`), calls Todoist API v1 (`/api/v1/tasks/completed/by_completion_date`, cursor-paginated with `limit=200`, chunked into Todoist's 3-month completion-date windows, rate-limit-aware with 429 backoff), caches raw items + fetched range + window bounds + UI settings, exposes IPC handlers.
 - **Preload** (`electron/preload.js`): `contextBridge` exposes `window.api.fetchTasks()`, `getCached()`, `getToken()`, `setToken()`, `clearToken()`, `getSettings()`, `setSettings()`, `setZoom()`, `getTheme()`, `openExternal()`, plus focus and theme listeners.
-- **Renderer** (`src/`): vanilla JS — no framework. First-run shows the Settings view to enter a token; otherwise boots from cache instantly, then refreshes in background.
-- **Reflow**: graph computes `maxWeeks = floor((width + gap) / weekWidth)` on every render; `resize` re-renders so cells stay fixed (11px) and the column count adapts.
+- **Renderer** (`src/`): vanilla JS — no framework. First-run shows the Settings view to enter a token; otherwise boots from cache instantly, then requests fresh data for the visible range as needed.
+- **Reflow**: graph computes the visible date range from `maxWeeks = floor((width + gap) / weekWidth)`; `resize` re-renders so cells stay fixed (11px), the column count adapts, and cache refreshes when the new visible range is not covered.
 - **Security**: `contextIsolation: true`, no `nodeIntegration`. The token never reaches the renderer — all Todoist HTTP calls live in main.
 
 ## Develop
