@@ -18,6 +18,13 @@
   "build": {
     "appId": "com.mohitvirli.todoistgraph",
     "productName": "Todoist Graph",
+    "icon": "build/icon.png",
+    "extraResources": [
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
+      }
+    ],
     "directories": {
       "output": "dist-electron"
     },

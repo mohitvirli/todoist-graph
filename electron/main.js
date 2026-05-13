@@ -23,6 +23,12 @@ const store = new Store({
 let mainWindow = null;
 const isDev = !app.isPackaged;
 
+function getWindowIconPath() {
+  if (isDev) return path.join(__dirname, '..', 'build', 'icon.png');
+  const packaged = path.join(process.resourcesPath, 'icon.png');
+  return fs.existsSync(packaged) ? packaged : undefined;
+}
+
 /** Minimum time between Todoist HTTP calls (pagination, verify, etc.) */
 const MIN_MS_BETWEEN_TODOIST_REQUESTS = 400;
 /** Minimum time between completed full syncs (`fetch-tasks`) */
@@ -120,7 +126,8 @@ async function todoistGet(url, token) {
 function createWindow() {
   const bounds = store.get('bounds');
 
-  mainWindow = new BrowserWindow({
+  const iconPath = getWindowIconPath();
+  const windowOpts = {
     width: bounds.width,
     height: bounds.height,
     x: bounds.x,
@@ -137,7 +144,9 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: false
     }
-  });
+  };
+  if (iconPath && fs.existsSync(iconPath)) windowOpts.icon = iconPath;
+  mainWindow = new BrowserWindow(windowOpts);
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
