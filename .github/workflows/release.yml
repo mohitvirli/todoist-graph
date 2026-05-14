@@ -23,12 +23,13 @@ jobs:
       - run: npm ci
       - run: npm run build:renderer
       - run: npx electron-builder --mac dmg --arm64 --x64 --publish never
+      - name: Release notes from CHANGELOG
+        run: node scripts/write-release-notes.js > release-notes.md
       - uses: softprops/action-gh-release@v2
         with:
           files: dist-electron/*.dmg
-          # Only this job generates notes; the Windows job attaches to the same
-          # release and would duplicate "Full Changelog" if both used this flag.
-          generate_release_notes: true
+          body_path: release-notes.md
+          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
