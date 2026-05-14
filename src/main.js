@@ -18,6 +18,7 @@ const themeSelect = document.getElementById('theme-select');
 const zoomSlider = document.getElementById('zoom-slider');
 const zoomValueEl = document.getElementById('zoom-value');
 const labelsToggle = document.getElementById('labels-toggle');
+const statsToggle = document.getElementById('stats-toggle');
 
 const closeBtn = document.getElementById('close-btn');
 
@@ -40,7 +41,7 @@ let lastFetchError = null;
 let fetching = false;
 let refreshQueued = false;
 let hasToken = false;
-let settings = { theme: 'system', zoom: 1, showLabels: true };
+let settings = { theme: 'system', zoom: 1, showLabels: true, showStatsBar: true };
 let systemDark = false;
 
 function applyTheme(themeName) {
@@ -53,6 +54,10 @@ function applyTheme(themeName) {
 
 function applyZoom(factor) {
   if (window.api?.setZoom) window.api.setZoom(factor);
+}
+
+function applyStatsBarVisibility() {
+  statsEl.hidden = !settings.showStatsBar;
 }
 
 function zoomFromSlider() {
@@ -148,6 +153,7 @@ function showSetup(prefill = '') {
   themeSelect.value = settings.theme;
   syncZoomSlider(settings.zoom);
   labelsToggle.checked = !!settings.showLabels;
+  statsToggle.checked = !!settings.showStatsBar;
   setupError.hidden = true;
   setSettingsButtonMode(true);
   setTimeout(() => tokenInput.focus(), 50);
@@ -158,6 +164,7 @@ function showGraph() {
   graphView.hidden = false;
   refreshBtn.style.display = '';
   setSettingsButtonMode(false);
+  applyStatsBarVisibility();
   requestAnimationFrame(rerender);
 }
 
@@ -210,6 +217,7 @@ async function saveSettings() {
   const newTheme = themeSelect.value;
   const newZoom = zoomFromSlider();
   const newShowLabels = !!labelsToggle.checked;
+  const newShowStatsBar = !!statsToggle.checked;
 
   setupError.hidden = true;
 
@@ -217,9 +225,16 @@ async function saveSettings() {
   settings.theme = newTheme;
   settings.zoom = newZoom;
   settings.showLabels = newShowLabels;
+  settings.showStatsBar = newShowStatsBar;
   applyTheme(newTheme);
   applyZoom(newZoom);
-  await window.api.setSettings({ theme: newTheme, zoom: newZoom, showLabels: newShowLabels });
+  applyStatsBarVisibility();
+  await window.api.setSettings({
+    theme: newTheme,
+    zoom: newZoom,
+    showLabels: newShowLabels,
+    showStatsBar: newShowStatsBar
+  });
 
   // Token: verify only when the value changed (same as stored → skip API check)
   if (val) {
@@ -264,10 +279,12 @@ async function bootstrap() {
   settings = {
     theme: loadedTheme,
     zoom: typeof loaded.zoom === 'number' ? loaded.zoom : 1,
-    showLabels: typeof loaded.showLabels === 'boolean' ? loaded.showLabels : true
+    showLabels: typeof loaded.showLabels === 'boolean' ? loaded.showLabels : true,
+    showStatsBar: typeof loaded.showStatsBar === 'boolean' ? loaded.showStatsBar : true
   };
   applyTheme(settings.theme);
   applyZoom(settings.zoom);
+  applyStatsBarVisibility();
 
   const token = await window.api.getToken();
   hasToken = !!token;
@@ -313,6 +330,12 @@ labelsToggle.addEventListener('change', () => {
   rerender();
   refreshIfNeeded();
   window.api.setSettings({ showLabels: v });
+});
+statsToggle.addEventListener('change', () => {
+  const v = !!statsToggle.checked;
+  settings.showStatsBar = v;
+  applyStatsBarVisibility();
+  window.api.setSettings({ showStatsBar: v });
 });
 zoomSlider.addEventListener('input', () => {
   const pct = parseInt(zoomSlider.value, 10);

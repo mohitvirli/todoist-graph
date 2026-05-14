@@ -13,7 +13,8 @@
     "build:renderer": "vite build",
     "build": "npm run build:renderer && electron-builder --mac dmg --arm64 --x64",
     "build:win": "npm run build:renderer && electron-builder --win nsis --x64",
-    "release": "npm run build && gh release create v$npm_package_version dist-electron/*.dmg --generate-notes --title v$npm_package_version"
+    "release:notes": "node scripts/write-release-notes.js",
+    "release": "npm run build && NOTES=\"$(mktemp -t todoist-graph-release-notes)\" && node scripts/write-release-notes.js > \"$NOTES\" && gh release create \"v$npm_package_version\" dist-electron/*.dmg --notes-file \"$NOTES\" --title \"v$npm_package_version\" && rm -f \"$NOTES\""
   },
   "build": {
     "appId": "com.mohitvirli.todoistgraph",
